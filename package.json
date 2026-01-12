@@ -48,7 +48,8 @@
     "test": "vitest run",
     "test:watch": "vitest --project Chromium --browser.provider preview --browser.headless=false",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "playground": "bun build playground/main.ts --outdir playground/dist && bun run playground/serve.ts"
   },
   "dependencies": {
     "@webcontainer/api": "^1.6.1",

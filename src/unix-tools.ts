@@ -46,7 +46,8 @@ function createShxWrapper(command: string): string {
   return `#!/usr/bin/env node
 const { spawnSync } = require('child_process');
 const args = process.argv.slice(2);
-const result = spawnSync('npx', ['shx', '${command}', ...args], {
+// Use npx with --no-install to ensure we use the locally installed shx
+const result = spawnSync('npx', ['--no-install', 'shx', '${command}', ...args], {
   stdio: 'inherit',
   env: process.env,
 });
@@ -123,7 +124,7 @@ export interface InstallUnixToolsOptions {
   commands?: readonly ShellJSCommand[] | ShellJSCommand[];
 
   /**
-   * Directory to install tools. Defaults to "/usr/local/bin".
+   * Directory to install tools. Defaults to "usr/local/bin" (relative to root).
    */
   mountPoint?: string;
 
@@ -171,6 +172,12 @@ export function createUnixToolsTree(
 }
 
 /**
+ * The default directory where tools are installed within the WebContainer.
+ * Using a sub-folder in node_modules/.bin is reliable and keeps the bin directory clean.
+ */
+export const DEFAULT_MOUNT_POINT = "node_modules/.bin/shelljs-commands";
+
+/**
  * Install Unix tools into a WebContainer instance.
  *
  * By default, installs the recommended commands (grep, find, sed, uniq, test, dirs)
@@ -203,18 +210,25 @@ export async function installUnixTools(
 ): Promise<void> {
   const {
     commands = RECOMMENDED_COMMANDS,
-    mountPoint = "/usr/local/bin",
+    mountPoint = DEFAULT_MOUNT_POINT,
     installShx = true,
     overrideBuiltins = false,
   } = options;
 
   // install shx if needed
   if (installShx) {
-    const proc = await container.spawn("npm", ["install", "shx", "--save-dev"]);
-    const exitCode = await proc.exit;
+    try {
+      const proc = await container.spawn("jsh", [
+        "-c",
+        "npm install shx --save-dev",
+      ]);
+      const exitCode = await proc.exit;
 
-    if (exitCode !== 0) {
-      throw new Error(`Failed to install shx (exit code: ${exitCode})`);
+      if (exitCode !== 0) {
+        throw new Error(`npm install shx failed with exit code ${exitCode}`);
+      }
+    } catch (e: any) {
+      throw new Error(`Step: Install shx - ${e.message}`);
     }
   }
 
@@ -225,15 +239,41 @@ export async function installUnixTools(
     return;
   }
 
+  // ensure the mount point exists
+  if (mountPoint && mountPoint !== "." && mountPoint !== "/") {
+    try {
+      const proc = await container.spawn("jsh", [
+        "-c",
+        `mkdir -p "${mountPoint}"`,
+      ]);
+      await proc.exit;
+    } catch (e: any) {
+      // ignore errors if mkdir fails (e.g. dir already exists)
+    }
+  }
+
   // mount the tools to the specified directory
-  await container.mount(tree, { mountPoint });
+  try {
+    await container.mount(tree, { mountPoint });
+  } catch (e: any) {
+    throw new Error(`Step: Mount tools to ${mountPoint} - ${e.message}`);
+  }
 
   // make each tool executable
   for (const command of Object.keys(tree)) {
-    const proc = await container.spawn("chmod", [
-      "+x",
-      `${mountPoint}/${command}`,
-    ]);
-    await proc.exit;
+    try {
+      const proc = await container.spawn("jsh", [
+        "-c",
+        `chmod +x "${mountPoint}/${command}"`,
+      ]);
+      const exitCode = await proc.exit;
+      if (exitCode !== 0) {
+        throw new Error(
+          `chmod +x failed for ${command} with exit code ${exitCode}`,
+        );
+      }
+    } catch (e: any) {
+      throw new Error(`Step: Make ${command} executable - ${e.message}`);
+    }
   }
 }
