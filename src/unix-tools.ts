@@ -54,39 +54,71 @@ const args = process.argv.slice(2);
 // Tools that ShellJS/shx doesn't support stdin for (bridging via temp file)
 const STDIN_FALLBACK_COMMANDS = ['uniq', 'sort', 'head', 'tail'];
 const isFallbackCommand = STDIN_FALLBACK_COMMANDS.includes('${command}');
-// Heuristic: if no arguments or all arguments are flags
 const hasNoFileArgs = args.length === 0 || !args.some(arg => !arg.startsWith('-'));
 
+function debug(...msg) {
+  // Mandatory logging for debugging automated tests
+  console.error(\`[shim:${command}:\${process.pid}]\`, ...msg);
+}
+
 if (isFallbackCommand && hasNoFileArgs && !process.stdin.isTTY) {
-  const tempFile = path.join('/tmp', 'shx-stdin-' + Math.random().toString(36).slice(2));
+  const tempFile = path.join('/tmp', 'shx-stdin-' + process.pid + '-' + Math.random().toString(36).slice(2));
+  debug('Fallback mode: reading stdin to', tempFile);
   const writeStream = fs.createWriteStream(tempFile);
   
+  process.stdin.resume();
   process.stdin.pipe(writeStream);
   
+  writeStream.on('error', (err) => {
+    debug('Stdin write error:', err.message);
+    process.exit(1);
+  });
+
   writeStream.on('finish', () => {
-    const child = spawn('node', [shxPath, '${command}', ...args, tempFile], {
-      stdio: 'inherit'
+    const size = fs.statSync(tempFile).size;
+    debug('Stdin read finished. Size:', size, 'bytes');
+    
+    // Explicitly run the tool on the temp file
+    const child = spawn(process.execPath, [shxPath, '${command}', ...args, tempFile], {
+      stdio: ['ignore', 'pipe', 'pipe']
     });
+
+    child.stdout.pipe(process.stdout);
+    child.stderr.pipe(process.stderr);
+
     child.on('exit', (code) => {
+      debug('Worker exited with code:', code);
       try { fs.unlinkSync(tempFile); } catch (e) {}
       process.exit(code ?? 0);
     });
+
+    child.on('error', (err) => {
+      debug('Worker spawn error:', err.message);
+      try { fs.unlinkSync(tempFile); } catch (e) {}
+      process.exit(1);
+    });
   });
 } else {
-  const child = spawn('node', [shxPath, '${command}', ...args], {
-    stdio: ['pipe', 'inherit', 'inherit']
+  debug('Direct mode: spawning child with stdin pipe');
+  const child = spawn(process.execPath, [shxPath, '${command}', ...args], {
+    stdio: ['pipe', 'pipe', 'pipe']
   });
   
+  child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
   if (!process.stdin.isTTY) {
+    process.stdin.resume();
     process.stdin.pipe(child.stdin);
   }
 
   child.on('exit', (code) => {
+    debug('Direct child exited with code:', code);
     process.exit(code ?? 0);
   });
 
   child.on('error', (err) => {
-    console.error(err);
+    debug('Direct child spawn error:', err.message);
     process.exit(1);
   });
 }

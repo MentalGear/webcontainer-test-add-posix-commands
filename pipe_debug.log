@@ -1,0 +1,7 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.14 [39m[90m/Users/Tom/projects/webcontainer-unix-cmds/webcontainer-test-add-posix-commands[39m
+
+[90mstderr[2m | test/pipes.test.ts[2m > [22m[2mhandles 3-pipe chain: cat | sort | uniq
+[22m[39m[webcontainer-test]: Closed process keeps writing to output. Closing reader forcefully. 
+                     Received: "[shim:uniq:9] Fallback mode: reading stdin to /tmp/shx-stdin-9-vu9h0xjx8s
+".
