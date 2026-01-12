@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebContainer Unix Tools Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 {
+      color: #00d4ff;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #888;
+      margin-bottom: 20px;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .panel {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #0f3460;
+    }
+    .panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #00d4ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    #terminal {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      padding: 15px;
+      border-radius: 6px;
+      height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px 15px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+    button {
+      padding: 10px 20px;
+      background: #00d4ff;
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #00a8cc;
+    }
+    button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .status.loading {
+      background: #1e3a5f;
+      color: #00d4ff;
+    }
+    .status.ready {
+      background: #1e5f3a;
+      color: #00ff88;
+    }
+    .status.error {
+      background: #5f1e1e;
+      color: #ff4444;
+    }
+    .commands-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    .command-btn {
+      padding: 8px;
+      font-size: 12px;
+      background: #0f3460;
+    }
+    .command-btn:hover {
+      background: #1a4a7a;
+    }
+    .examples {
+      font-size: 12px;
+      color: #888;
+      margin-top: 10px;
+    }
+    .examples code {
+      background: #0d1117;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #00d4ff;
+    }
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>WebContainer Unix Tools Playground</h1>
+  <p class="subtitle">Test grep, find, sed, uniq, test, and dirs commands in WebContainers</p>
+
+  <div class="container">
+    <div class="panel">
+      <h2>Terminal</h2>
+      <div id="status" class="status loading">Booting WebContainer...</div>
+      <div id="terminal"></div>
+      <div class="input-row">
+        <input type="text" id="command" placeholder="Enter command (e.g., grep hello test.txt)" disabled>
+        <button id="run" disabled>Run</button>
+      </div>
+      <div class="examples">
+        <strong>Try:</strong>
+        <code>grep hello test.txt</code> |
+        <code>find . -name "*.txt"</code> |
+        <code>sed 's/hello/hi/g' test.txt</code>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Quick Commands</h2>
+      <div class="commands-list">
+        <button class="command-btn" data-cmd="ls -la">ls -la</button>
+        <button class="command-btn" data-cmd="cat test.txt">cat test.txt</button>
+        <button class="command-btn" data-cmd="grep hello test.txt">grep hello</button>
+        <button class="command-btn" data-cmd="grep -i HELLO test.txt">grep -i</button>
+        <button class="command-btn" data-cmd="find . -name '*.txt'">find *.txt</button>
+        <button class="command-btn" data-cmd="find . -type f">find files</button>
+        <button class="command-btn" data-cmd="sed 's/hello/hi/g' test.txt">sed replace</button>
+        <button class="command-btn" data-cmd="uniq dupes.txt">uniq</button>
+        <button class="command-btn" data-cmd="test -f test.txt && echo exists">test -f</button>
+        <button class="command-btn" data-cmd="cat test.txt | grep hello">pipe test</button>
+        <button class="command-btn" data-cmd="dirs">dirs</button>
+        <button class="command-btn" data-cmd="cat numbers.txt | sort | uniq">sort | uniq</button>
+      </div>
+
+      <h2>Files in Container</h2>
+      <div id="files" style="font-family: monospace; font-size: 12px; color: #888;">
+        Loading...
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { WebContainer } from 'https://esm.sh/@webcontainer/api@1.6.1';
+
+    const terminal = document.getElementById('terminal');
+    const status = document.getElementById('status');
+    const commandInput = document.getElementById('command');
+    const runButton = document.getElementById('run');
+    const filesDiv = document.getElementById('files');
+
+    let webcontainer;
+
+    function log(text, color = '#c9d1d9') {
+      terminal.innerHTML += `<span style="color: ${color}">${escapeHtml(text)}</span>\n`;
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function setStatus(text, type) {
+      status.textContent = text;
+      status.className = 'status ' + type;
+    }
+
+    // shx wrapper script generator
+    function createShxWrapper(command) {
+      return `#!/usr/bin/env node
+const { spawnSync } = require('child_process');
+const args = process.argv.slice(2);
+const result = spawnSync('npx', ['shx', '${command}', ...args], {
+  stdio: 'inherit',
+  env: process.env,
+});
+process.exit(result.status ?? 1);
+`;
+    }
+
+    async function boot() {
+      try {
+        log('Booting WebContainer...', '#00d4ff');
+        webcontainer = await WebContainer.boot();
+
+        log('Creating project files...', '#00d4ff');
+
+        // Mount initial files
+        await webcontainer.mount({
+          'package.json': {
+            file: {
+              contents: JSON.stringify({
+                name: 'unix-tools-playground',
+                version: '1.0.0',
+                devDependencies: {
+                  shx: '^0.3.4'
+                }
+              }, null, 2)
+            }
+          },
+          'test.txt': {
+            file: {
+              contents: 'hello world\nfoo bar\nhello again\ntest line\nhello there\n'
+            }
+          },
+          'dupes.txt': {
+            file: {
+              contents: 'apple\napple\nbanana\nbanana\nbanana\napple\ncherry\n'
+            }
+          },
+          'numbers.txt': {
+            file: {
+              contents: '3\n1\n2\n1\n3\n2\n1\n'
+            }
+          },
+          'src': {
+            directory: {
+              'app.js': {
+                file: { contents: 'console.log("app");' }
+              },
+              'util.js': {
+                file: { contents: 'console.log("util");' }
+              },
+              'readme.md': {
+                file: { contents: '# Source\n' }
+              }
+            }
+          }
+        });
+
+        log('Installing shx (ShellJS CLI)...', '#00d4ff');
+        const installProcess = await webcontainer.spawn('npm', ['install']);
+
+        installProcess.output.pipeTo(new WritableStream({
+          write(data) {
+            if (data.trim()) log(data, '#888');
+          }
+        }));
+
+        const installExitCode = await installProcess.exit;
+        if (installExitCode !== 0) {
+          throw new Error('npm install failed');
+        }
+
+        log('Installing Unix tools (grep, find, sed, uniq, test, dirs)...', '#00d4ff');
+
+        // Install wrapper scripts
+        const commands = ['grep', 'find', 'sed', 'uniq', 'test', 'dirs'];
+        for (const cmd of commands) {
+          await webcontainer.mount({
+            [cmd]: {
+              file: { contents: createShxWrapper(cmd) }
+            }
+          }, { mountPoint: '/usr/local/bin' });
+
+          const chmod = await webcontainer.spawn('chmod', ['+x', `/usr/local/bin/${cmd}`]);
+          await chmod.exit;
+        }
+
+        log('Ready! Unix tools installed: ' + commands.join(', '), '#00ff88');
+        log('', '#888');
+
+        setStatus('Ready - Unix tools installed', 'ready');
+        commandInput.disabled = false;
+        runButton.disabled = false;
+
+        // Enable quick command buttons
+        document.querySelectorAll('.command-btn').forEach(btn => {
+          btn.disabled = false;
+        });
+
+        await updateFilesList();
+
+      } catch (error) {
+        log('Error: ' + error.message, '#ff4444');
+        setStatus('Error: ' + error.message, 'error');
+      }
+    }
+
+    async function runCommand(cmd) {
+      if (!cmd.trim()) return;
+
+      log(`$ ${cmd}`, '#00d4ff');
+
+      try {
+        // Parse command - handle pipes
+        const process = await webcontainer.spawn('sh', ['-c', cmd]);
+
+        process.output.pipeTo(new WritableStream({
+          write(data) {
+            log(data.trimEnd());
+          }
+        }));
+
+        const exitCode = await process.exit;
+        if (exitCode !== 0) {
+          log(`(exit code: ${exitCode})`, '#ff8844');
+        }
+        log('');
+      } catch (error) {
+        log('Error: ' + error.message, '#ff4444');
+      }
+    }
+
+    async function updateFilesList() {
+      try {
+        const process = await webcontainer.spawn('find', ['.', '-type', 'f', '-name', '*']);
+        let output = '';
+
+        process.output.pipeTo(new WritableStream({
+          write(data) {
+            output += data;
+          }
+        }));
+
+        await process.exit;
+
+        const files = output.trim().split('\n')
+          .filter(f => !f.includes('node_modules') && f.trim())
+          .sort();
+
+        filesDiv.innerHTML = files.map(f => `<div>${escapeHtml(f)}</div>`).join('');
+      } catch (e) {
+        filesDiv.textContent = 'Error loading files';
+      }
+    }
+
+    // Event handlers
+    runButton.addEventListener('click', () => {
+      runCommand(commandInput.value);
+      commandInput.value = '';
+    });
+
+    commandInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        runCommand(commandInput.value);
+        commandInput.value = '';
+      }
+    });
+
+    document.querySelectorAll('.command-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd;
+        commandInput.value = cmd;
+        runCommand(cmd);
+        commandInput.value = '';
+      });
+    });
+
+    // Start
+    boot();
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { WebContainer as WebContainerApi } from "@webcontainer/api";
 
-import { installUnixTools, UNIX_TOOLS } from "../unix-tools";
+import { installUnixTools, type InstallUnixToolsOptions } from "../unix-tools";
 import { FileSystem } from "./file-system";
 import { ProcessWrap } from "./process";
 
@@ -82,31 +82,33 @@ export class WebContainer extends FileSystem {
   }
 
   /**
-   * Install Unix tools (grep, find, sed, awk, wc, xargs) into WebContainer.
-   * These are self-contained Node.js implementations that work without external dependencies.
+   * Install Unix tools (grep, find, sed, uniq, test, dirs) into WebContainer.
+   * Uses shx (ShellJS CLI) for battle-tested implementations.
    *
-   * @param options - Installation options
-   * @param options.tools - Specific tools to install (defaults to all)
-   * @param options.mountPoint - Directory to install tools (defaults to /usr/local/bin)
+   * By default, installs recommended commands that WebContainers doesn't have.
+   * Use `overrideBuiltins: true` to install commands even if WebContainers has them.
+   *
+   * @param options - Installation options.
    *
    * @example
    * ```ts
-   * // Install all Unix tools
+   * // Install recommended commands (grep, find, sed, uniq, test, dirs)
    * await webcontainer.installUnixTools();
    *
-   * // Install specific tools only
-   * await webcontainer.installUnixTools({ tools: ['grep', 'find'] });
+   * // Install specific commands only
+   * await webcontainer.installUnixTools({ commands: ['grep', 'find'] });
+   *
+   * // Override WebContainer built-ins with ShellJS versions
+   * await webcontainer.installUnixTools({
+   *   commands: ['cat', 'head'],
+   *   overrideBuiltins: true,
+   * });
    *
    * // Use the installed tools
-   * const output = await webcontainer.runCommand('grep', ['-r', 'pattern', '.']);
+   * const output = await webcontainer.runCommand('grep', ['pattern', 'file.txt']);
    * ```
    */
-  async installUnixTools(
-    options: {
-      tools?: (keyof typeof UNIX_TOOLS)[];
-      mountPoint?: string;
-    } = {},
-  ): Promise<void> {
+  async installUnixTools(options: InstallUnixToolsOptions = {}): Promise<void> {
     await installUnixTools(this._instance, options);
   }
 }
