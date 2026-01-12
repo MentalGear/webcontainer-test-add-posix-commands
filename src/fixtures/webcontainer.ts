@@ -1,5 +1,6 @@
 import { WebContainer as WebContainerApi } from "@webcontainer/api";
 
+import { installUnixTools, UNIX_TOOLS } from "../unix-tools";
 import { FileSystem } from "./file-system";
 import { ProcessWrap } from "./process";
 
@@ -78,5 +79,34 @@ export class WebContainer extends FileSystem {
     this._onExit.push(() => proc.exit());
 
     return proc;
+  }
+
+  /**
+   * Install Unix tools (grep, find, sed, awk, wc, xargs) into WebContainer.
+   * These are self-contained Node.js implementations that work without external dependencies.
+   *
+   * @param options - Installation options
+   * @param options.tools - Specific tools to install (defaults to all)
+   * @param options.mountPoint - Directory to install tools (defaults to /usr/local/bin)
+   *
+   * @example
+   * ```ts
+   * // Install all Unix tools
+   * await webcontainer.installUnixTools();
+   *
+   * // Install specific tools only
+   * await webcontainer.installUnixTools({ tools: ['grep', 'find'] });
+   *
+   * // Use the installed tools
+   * const output = await webcontainer.runCommand('grep', ['-r', 'pattern', '.']);
+   * ```
+   */
+  async installUnixTools(
+    options: {
+      tools?: (keyof typeof UNIX_TOOLS)[];
+      mountPoint?: string;
+    } = {},
+  ): Promise<void> {
+    await installUnixTools(this._instance, options);
   }
 }
