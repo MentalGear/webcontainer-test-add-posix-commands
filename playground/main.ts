@@ -9,6 +9,7 @@ const filesDiv = document.getElementById("files") as HTMLDivElement;
 
 let webcontainer: WebContainer;
 let currentDir: string = "";
+let rootPath: string = "";
 
 function log(text: string, color: string = "#c9d1d9") {
   // Enhanced ANSI escape code stripping (covers more cursor control codes)
@@ -109,10 +110,10 @@ async function runCommand(cmd: string) {
       }
     }
 
-    // Run command with toolsDir in PATH and maintained CWD
+    // Run command with toolsDir in PATH - USE ABSOLUTE PATH
     const process = await webcontainer.spawn(
       "jsh",
-      ["-c", `export PATH="./${toolsDir}:$PATH" && ${cmd}`],
+      ["-c", `export PATH="${rootPath}/${toolsDir}:$PATH" && ${cmd}`],
       {
         cwd: currentDir,
       },
@@ -143,6 +144,20 @@ async function boot() {
   try {
     log("Booting WebContainer...", "#00d4ff");
     webcontainer = await WebContainer.boot();
+
+    // Capture absolute root path
+    const rootProc = await webcontainer.spawn("pwd");
+    let rawRoot = "";
+    rootProc.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          rawRoot += data;
+        },
+      }),
+    );
+    await rootProc.exit;
+    rootPath = rawRoot.trim();
+    log(`Project root: ${rootPath}`, "#888");
 
     log("Creating project files...", "#00d4ff");
 
@@ -234,6 +249,7 @@ async function boot() {
       },
       {
         mountPoint: toolsDir,
+        overrideBuiltins: true,
       },
     );
 

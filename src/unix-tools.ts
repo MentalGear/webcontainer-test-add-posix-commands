@@ -44,14 +44,52 @@ export const WEBCONTAINER_BUILTINS = [
  */
 function createShxWrapper(command: string): string {
   return `#!/usr/bin/env node
-const { spawnSync } = require('child_process');
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const shxPath = path.resolve(__dirname, '../shx/lib/cli.js');
 const args = process.argv.slice(2);
-// Use npx with --no-install to ensure we use the locally installed shx
-const result = spawnSync('npx', ['--no-install', 'shx', '${command}', ...args], {
-  stdio: 'inherit',
-  env: process.env,
-});
-process.exit(result.status ?? 1);
+
+// Tools that ShellJS/shx doesn't support stdin for (bridging via temp file)
+const STDIN_FALLBACK_COMMANDS = ['uniq', 'sort', 'head', 'tail'];
+const isFallbackCommand = STDIN_FALLBACK_COMMANDS.includes('${command}');
+// Heuristic: if no arguments or all arguments are flags
+const hasNoFileArgs = args.length === 0 || !args.some(arg => !arg.startsWith('-'));
+
+if (isFallbackCommand && hasNoFileArgs && !process.stdin.isTTY) {
+  const tempFile = path.join('/tmp', 'shx-stdin-' + Math.random().toString(36).slice(2));
+  const writeStream = fs.createWriteStream(tempFile);
+  
+  process.stdin.pipe(writeStream);
+  
+  writeStream.on('finish', () => {
+    const child = spawn('node', [shxPath, '${command}', ...args, tempFile], {
+      stdio: 'inherit'
+    });
+    child.on('exit', (code) => {
+      try { fs.unlinkSync(tempFile); } catch (e) {}
+      process.exit(code ?? 0);
+    });
+  });
+} else {
+  const child = spawn('node', [shxPath, '${command}', ...args], {
+    stdio: ['pipe', 'inherit', 'inherit']
+  });
+  
+  if (!process.stdin.isTTY) {
+    process.stdin.pipe(child.stdin);
+  }
+
+  child.on('exit', (code) => {
+    process.exit(code ?? 0);
+  });
+
+  child.on('error', (err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
 `;
 }
 
@@ -93,6 +131,9 @@ export const RECOMMENDED_COMMANDS = [
   "uniq",
   "test",
   "dirs",
+  "head",
+  "tail",
+  "sort",
 ] as const;
 
 /**
@@ -175,7 +216,7 @@ export function createUnixToolsTree(
  * The default directory where tools are installed within the WebContainer.
  * Using a sub-folder in node_modules/.bin is reliable and keeps the bin directory clean.
  */
-export const DEFAULT_MOUNT_POINT = "node_modules/.bin/shelljs-commands";
+export const DEFAULT_MOUNT_POINT = "node_modules/.bin";
 
 /**
  * Install Unix tools into a WebContainer instance.
