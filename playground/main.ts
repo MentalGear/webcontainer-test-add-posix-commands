@@ -1,36 +1,27 @@
 import { WebContainer } from "@webcontainer/api";
+import { Terminal } from "@xterm/xterm";
+import "@xterm/xterm/css/xterm.css";
 import { installUnixTools, RECOMMENDED_COMMANDS } from "../src/unix-tools";
 
-const terminal = document.getElementById("terminal") as HTMLDivElement;
 const status = document.getElementById("status") as HTMLDivElement;
-const commandInput = document.getElementById("command") as HTMLInputElement;
-const runButton = document.getElementById("run") as HTMLButtonElement;
 const filesDiv = document.getElementById("files") as HTMLDivElement;
 
+// Initialize xterm.js
+const term = new Terminal({
+  cursorBlink: true,
+  convertEol: true,
+  fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+  fontSize: 13,
+  theme: {
+    background: "#0d1117",
+    foreground: "#c9d1d9",
+  },
+});
+term.open(document.getElementById("terminal") as HTMLDivElement);
+
 let webcontainer: WebContainer;
-let currentDir: string = "";
 let rootPath: string = "";
-
-function log(text: string, color: string = "#c9d1d9") {
-  // Enhanced ANSI escape code stripping (covers more cursor control codes)
-  const cleanedText = text.replace(
-    /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
-    "",
-  );
-
-  // If we have nothing left and it was noise, skip
-  if (!cleanedText.trim() && text.includes("\u001b")) return;
-
-  terminal.innerHTML += `<span style="color: ${color}">${escapeHtml(cleanedText)}</span>\n`;
-  terminal.scrollTop = terminal.scrollHeight;
-}
-
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+const toolsDir = "node_modules/.bin";
 
 function setStatus(text: string, type: string) {
   status.textContent = text;
@@ -39,11 +30,11 @@ function setStatus(text: string, type: string) {
 
 async function updateFilesList() {
   try {
-    const process = await webcontainer.spawn(
-      "jsh",
-      ["-c", "find . -type f -not -path '*/.*'"],
-      { cwd: currentDir },
-    );
+    // List files from root, ignoring .git, node_modules, etc.
+    const process = await webcontainer.spawn("jsh", [
+      "-c",
+      "find . -type f -not -path '*/.*' -not -path '*/node_modules/*'",
+    ]);
     let output = "";
 
     process.output.pipeTo(
@@ -59,91 +50,18 @@ async function updateFilesList() {
     const files = output
       .trim()
       .split("\n")
-      .filter((f) => !f.includes("node_modules") && f.trim())
+      .filter((f) => f.trim())
       .sort();
 
-    filesDiv.innerHTML = files
-      .map((f) => `<div>${escapeHtml(f)}</div>`)
-      .join("");
+    filesDiv.innerHTML = files.map((f) => `<div>${f}</div>`).join("");
   } catch (e) {
     filesDiv.textContent = "Error loading files";
   }
 }
 
-// IMPRTAMT: for some reason cmds only can be executed when placed in a directory with the name .bin in node_modules
-const toolsDir = "node_modules/.bin";
-
-async function runCommand(cmd: string) {
-  if (!cmd.trim()) return;
-
-  log(`${currentDir || "/"} $ ${cmd}`, "#00d4ff");
-
-  try {
-    // Check for cd command
-    // if (cmd.startsWith("cd ") || cmd === "cd") {
-    //   const target = cmd === "cd" ? "/" : cmd.slice(3).trim();
-
-    //   // We run cd in a subshell and capture the resulting pwd to update our state
-    //   const proc = await webcontainer.spawn("jsh", [
-    //     "-c",
-    //     // `cd "${currentDir || "."}" && cd "${target}" && pwd`,
-    //     `cd ${target}`,
-    //   ]);
-
-    //   let newPath = "";
-    //   proc.output.pipeTo(
-    //     new WritableStream({
-    //       write(data) {
-    //         newPath += data;
-    //       },
-    //     }),
-    //   );
-
-    //   const exitCode = await proc.exit;
-    //   if (exitCode === 0) {
-    //     currentDir = newPath.trim();
-    //     log(`Changed directory to: ${currentDir || "/"}`);
-    //     await updateFilesList();
-    //     return;
-    //   } else {
-    //     log(`cd failed`, "#ff4444");
-    //     return;
-    //   }
-    // }
-
-    // Run command with toolsDir in PATH - USE ABSOLUTE PATH
-    const process = await webcontainer.spawn(
-      "jsh",
-      ["-c", `export PATH="${rootPath}/${toolsDir}:$PATH" && ${cmd}`],
-      {
-        cwd: currentDir,
-      },
-    );
-
-    process.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          log(data.trimEnd());
-        },
-      }),
-    );
-
-    const exitCode = await process.exit;
-    if (exitCode !== 0) {
-      log(`(exit code: ${exitCode})`, "#ff8844");
-    }
-    log("");
-
-    // Update files list after command might have changed something
-    await updateFilesList();
-  } catch (error: any) {
-    log("Error: " + error.message, "#ff4444");
-  }
-}
-
 async function boot() {
   try {
-    log("Booting WebContainer...", "#00d4ff");
+    term.writeln("\x1b[36mBooting WebContainer...\x1b[0m");
     webcontainer = await WebContainer.boot();
 
     // Capture absolute root path
@@ -158,9 +76,9 @@ async function boot() {
     );
     await rootProc.exit;
     rootPath = rawRoot.trim();
-    log(`Project root: ${rootPath}`, "#888");
+    term.writeln(`\x1b[90mProject root: ${rootPath}\x1b[0m`);
 
-    log("Creating project files...", "#00d4ff");
+    term.writeln("\x1b[36mCreating project files...\x1b[0m");
 
     // Mount initial files
     await webcontainer.mount({
@@ -211,81 +129,41 @@ async function boot() {
       },
     });
 
-    log("Installing shx and Unix tools via library...", "#00d4ff");
-
-    // Check environment
-    const envProc = await webcontainer.spawn("jsh", [
-      "-c",
-      'echo "PATH: $PATH" && echo "CWD: $(pwd)" && ls -la package.json',
-    ]);
-    envProc.output.pipeTo(
+    term.writeln("\x1b[36mInstalling dependencies...\x1b[0m");
+    const installProc = await webcontainer.spawn("jsh", ["-c", "npm install"]);
+    installProc.output.pipeTo(
       new WritableStream({
         write(data) {
-          log(data.trim(), "#888");
+          term.write(data);
         },
       }),
     );
-    await envProc.exit;
+    const installExit = await installProc.exit;
+    if (installExit !== 0) {
+      throw new Error(`npm install failed with code ${installExit}`);
+    }
 
-    // Use the library's installUnixTools with better logging
+    term.writeln("\x1b[36mInstalling Unix tools...\x1b[0m");
+
+    // Use the library's installUnixTools - skip shx install as we did it above
     await installUnixTools(
       {
         mount: (tree, opts) => webcontainer.mount(tree, opts),
         spawn: async (cmd, args) => {
-          log(`$ ${cmd} ${(args ?? []).join(" ")}`, "#888");
-          try {
-            const proc = await webcontainer.spawn(cmd, args ?? []);
-            proc.output.pipeTo(
-              new WritableStream({
-                write(data) {
-                  if (data.trim()) log(data, "#666");
-                },
-              }),
-            );
-            return proc;
-          } catch (e: any) {
-            log(`Spawn Error [${cmd}]: ${e.message}`, "#ff4444");
-            throw e;
-          }
+          // We don't need to log every spawn here, but we can
+          // term.writeln(`\x1b[90m$ ${cmd} ${(args ?? []).join(" ")}\x1b[0m`);
+          return webcontainer.spawn(cmd, args ?? []);
         },
       },
       {
         mountPoint: toolsDir,
         overrideBuiltins: true,
+        installShx: false, // Already installed via npm install
       },
     );
 
-    log("Verifying installation...", "#00d4ff");
-    const verifyProc = await webcontainer.spawn("jsh", [
-      "-c",
-      `ls -la ${toolsDir}`,
-    ]);
-    verifyProc.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          log(data, "#888");
-        },
-      }),
-    );
-    await verifyProc.exit;
-
-    // Install wasm-git and mount git wrapper
-    log("Installing wasm-git...", "#00d4ff");
-    const gitInstallProc = await webcontainer.spawn("jsh", [
-      "-c",
-      "npm install wasm-git --save-dev",
-    ]);
-    gitInstallProc.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          if (data.trim()) log(data, "#666");
-        },
-      }),
-    );
-    await gitInstallProc.exit;
-
     // Fetch and mount the git wrapper script
-    log("Installing git command...", "#00d4ff");
+    term.writeln("\x1b[36mMounting git command...\x1b[0m");
     const gitWrapperResponse = await fetch("/git-wrapper.js");
     const gitWrapperContent = await gitWrapperResponse.text();
 
@@ -307,55 +185,118 @@ async function boot() {
     ]);
     await chmodGitProc.exit;
 
-    log(
-      "Ready! Unix tools installed: " +
+    term.writeln(
+      "\x1b[32mReady! Unix tools installed: " +
         RECOMMENDED_COMMANDS.join(", ") +
-        ", git",
-      "#00ff88",
+        ", git\x1b[0m",
     );
-    log("", "#888");
+    term.writeln("");
 
-    setStatus("Ready - Unix tools installed", "ready");
-    commandInput.disabled = false;
-    runButton.disabled = false;
+    // Confirm files exist
+    term.writeln("\x1b[36mVerifying installation...\x1b[0m");
+    const lsProc = await webcontainer.spawn("jsh", [
+      "-c",
+      `ls -la ${toolsDir}`,
+    ]);
+    lsProc.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          term.write(data);
+        },
+      }),
+    );
+    await lsProc.exit;
 
-    // Enable quick command buttons
-    document
-      .querySelectorAll<HTMLButtonElement>(".command-btn")
-      .forEach((btn) => {
-        btn.disabled = false;
-      });
+    // Try running git non-interactively to prove it works
+    term.writeln("\x1b[36mTest run: git --version\x1b[0m");
+    const testProc = await webcontainer.spawn(
+      "jsh",
+      ["-c", `export PATH="${rootPath}/${toolsDir}:$PATH" && git --version`], // use explicit path here to test
+    );
+    testProc.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          term.write(data);
+        },
+      }),
+    );
+    const testExit = await testProc.exit;
+    term.writeln(
+      testExit === 0
+        ? "\x1b[32mGit test passed\x1b[0m"
+        : `\x1b[31mGit test failed: ${testExit}\x1b[0m`,
+    );
 
+    setStatus("Ready - Shell Active", "ready");
+
+    // Update files list
     await updateFilesList();
+
+    // Start interactive shell
+    startShell();
   } catch (error: any) {
-    log("Error: " + error.message, "#ff4444");
+    term.writeln(`\x1b[31mError: ${error.message}\x1b[0m`);
     setStatus("Error: " + error.message, "error");
   }
 }
 
-// Event handlers
-runButton.addEventListener("click", () => {
-  runCommand(commandInput.value);
-  commandInput.value = "";
-});
+async function startShell() {
+  term.writeln("\x1b[33mStarting jsh shell...\x1b[0m");
 
-commandInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    runCommand(commandInput.value);
-    commandInput.value = "";
-  }
-});
-
-document.querySelectorAll<HTMLButtonElement>(".command-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const cmd = btn.getAttribute("data-cmd");
-    if (cmd) {
-      commandInput.value = cmd;
-      runCommand(cmd);
-      commandInput.value = "";
-    }
+  const shellProcess = await webcontainer.spawn("jsh", {
+    terminal: {
+      rows: term.rows,
+      cols: term.cols,
+    },
   });
-});
+
+  shellProcess.output.pipeTo(
+    new WritableStream({
+      write(data) {
+        term.write(data);
+      },
+    }),
+  );
+
+  const input = shellProcess.input.getWriter();
+
+  // FIX: Explicitly set PATH in the shell session because jsh might override env or not pick it up correctly for interactive sessions
+  await input.write(`export PATH="${rootPath}/${toolsDir}:$PATH"\r`);
+  // Optional: clear the output of the export command so it looks cleaner
+  // await input.write('clear\r');
+
+  term.onData((data) => {
+    input.write(data);
+  });
+
+  // Handle Quick Commands
+  document
+    .querySelectorAll<HTMLButtonElement>(".command-btn")
+    .forEach((btn) => {
+      btn.disabled = false;
+      btn.addEventListener("click", () => {
+        const cmd = btn.getAttribute("data-cmd");
+        if (cmd) {
+          // Send command to shell input + newline
+          input.write(cmd + "\r");
+        }
+      });
+    });
+
+  // Resize handling
+  // Note: jsh doesn't currently support dynamic resizing via API easily without sending signals,
+  // checking if resize method exists on process
+  if ((shellProcess as any).resize) {
+    // Only if the API supports it in the future or now
+    // For now we just ignore or we can try.
+    // WebContainer API v1.x supports resize
+    window.addEventListener("resize", () => {
+      // term.fit() if we had the addon
+      // manually:
+      // (shellProcess as any).resize({ cols: term.cols, rows: term.rows });
+    });
+  }
+}
 
 // Start
 boot();

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebContainer Unix Tools Playground</title>
+  <link rel="stylesheet" href="./dist/main.css">
   <style>
     * {
       box-sizing: border-box;
@@ -46,34 +47,10 @@
     }
     #terminal {
       background: #0d1117;
-      color: #c9d1d9;
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 13px;
-      padding: 15px;
+      padding: 0; /* Xterm has its own padding usually, but let's reset */
       border-radius: 6px;
       height: 400px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-    .input-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: 10px 15px;
-      font-family: 'Monaco', 'Menlo', monospace;
-      font-size: 14px;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #c9d1d9;
-    }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: #00d4ff;
+      overflow: hidden; /* Xterm handles scroll */
     }
     button {
       padding: 10px 20px;
@@ -152,10 +129,6 @@
       <h2>Terminal</h2>
       <div id="status" class="status loading">Booting WebContainer...</div>
       <div id="terminal"></div>
-      <div class="input-row">
-        <input type="text" id="command" placeholder="Enter command (e.g., grep hello test.txt)" disabled>
-        <button id="run" disabled>Run</button>
-      </div>
       <div class="examples">
         <strong>Try:</strong>
         <code>grep hello test.txt</code> |
