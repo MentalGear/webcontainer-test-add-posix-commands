@@ -14,6 +14,9 @@ importers:
       '@webcontainer/snapshot':
         specifier: ^0.1.0
         version: 0.1.0
+      wasm-git:
+        specifier: ^0.0.13
+        version: 0.0.13
     devDependencies:
       '@blitz/eslint-plugin':
         specifier: ^0.1.4
@@ -1648,6 +1651,9 @@ packages:
       jsdom:
         optional: true
 
+  wasm-git@0.0.13:
+    resolution: {integrity: sha512-+tXBed4anOsBIX94omuuabzDTrhQDh5sNsgD7Ezq9nuvM9aK8XfDADK0MWOmkMdSrXCaU1YKzWtTErRFvfwdWg==}
+
   webidl-conversions@4.0.2:
     resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
 
@@ -3204,6 +3210,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  wasm-git@0.0.13: {}
 
   webidl-conversions@4.0.2: {}
 
