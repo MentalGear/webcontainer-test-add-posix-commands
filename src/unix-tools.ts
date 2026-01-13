@@ -1,4 +1,5 @@
 import type { FileSystemTree } from "@webcontainer/api";
+import { FIND_SCRIPT, SHX_SCRIPT } from "./scripts";
 
 /**
  * Node.js wrapper scripts that use ShellJS for Unix command implementations.
@@ -40,56 +41,28 @@ export const WEBCONTAINER_BUILTINS = [
 
 /**
  * Creates a shx wrapper script for a given command.
- * Uses npx to run shx with the command and all arguments.
+ * All commands are routed through our custom shx to ensure consistent behavior.
  */
 function createShxWrapper(command: string): string {
   return `#!/usr/bin/env node
 const { spawn } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
-const shxPath = path.resolve(__dirname, '../shx/lib/cli.js');
+const shxPath = path.join(__dirname, 'shx');
 const args = process.argv.slice(2);
 
-// Tools that ShellJS/shx doesn't support stdin for (bridging via temp file)
-const STDIN_FALLBACK_COMMANDS = ['uniq', 'sort', 'head', 'tail'];
-const isFallbackCommand = STDIN_FALLBACK_COMMANDS.includes('${command}');
-// Heuristic: if no arguments or all arguments are flags
-const hasNoFileArgs = args.length === 0 || !args.some(arg => !arg.startsWith('-'));
+const child = spawn('node', [shxPath, '${command}', ...args], {
+  stdio: 'inherit'
+});
 
-if (isFallbackCommand && hasNoFileArgs && !process.stdin.isTTY) {
-  const tempFile = path.join('/tmp', 'shx-stdin-' + Math.random().toString(36).slice(2));
-  const writeStream = fs.createWriteStream(tempFile);
-  
-  process.stdin.pipe(writeStream);
-  
-  writeStream.on('finish', () => {
-    const child = spawn('node', [shxPath, '${command}', ...args, tempFile], {
-      stdio: 'inherit'
-    });
-    child.on('exit', (code) => {
-      try { fs.unlinkSync(tempFile); } catch (e) {}
-      process.exit(code ?? 0);
-    });
-  });
-} else {
-  const child = spawn('node', [shxPath, '${command}', ...args], {
-    stdio: ['pipe', 'inherit', 'inherit']
-  });
-  
-  if (!process.stdin.isTTY) {
-    process.stdin.pipe(child.stdin);
-  }
+child.on('exit', (code) => {
+  process.exit(code ?? 0);
+});
 
-  child.on('exit', (code) => {
-    process.exit(code ?? 0);
-  });
-
-  child.on('error', (err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}
+child.on('error', (err) => {
+  console.error(err);
+  process.exit(1);
+});
 `;
 }
 
@@ -191,7 +164,23 @@ export function createUnixToolsTree(
 ): FileSystemTree {
   const tree: FileSystemTree = {};
 
+  // Mount our custom shx engine engine
+  tree["shx"] = {
+    file: {
+      contents: SHX_SCRIPT,
+    },
+  };
+
+  // Mount find directly (our shx find will also delegate to this)
+  tree["find"] = {
+    file: {
+      contents: FIND_SCRIPT,
+    },
+  };
+
   for (const command of commands) {
+    if (command === "find") continue;
+
     // skip WebContainer built-ins unless override is enabled
     if (
       !overrideBuiltins &&
@@ -221,29 +210,8 @@ export const DEFAULT_MOUNT_POINT = "node_modules/.bin";
 /**
  * Install Unix tools into a WebContainer instance.
  *
- * By default, installs the recommended commands (grep, find, sed, uniq, test, dirs)
- * that are missing from WebContainers' built-in jsh shell.
- *
  * @param container - The WebContainer instance.
  * @param options - Installation options.
- *
- * @example
- * ```ts
- * // Install recommended commands (grep, find, sed, uniq, test, dirs)
- * await installUnixTools(webcontainer);
- *
- * // Install specific commands only
- * await installUnixTools(webcontainer, { commands: ['grep', 'sed'] });
- *
- * // Install all ShellJS commands, including those WebContainers already has
- * await installUnixTools(webcontainer, {
- *   commands: ALL_SHELLJS_COMMANDS,
- *   overrideBuiltins: true,
- * });
- *
- * // Use the installed tools
- * const output = await webcontainer.runCommand('grep', ['pattern', 'file.txt']);
- * ```
  */
 export async function installUnixTools(
   container: UnixToolsTarget,
@@ -273,12 +241,20 @@ export async function installUnixTools(
     }
   }
 
-  const tree = createUnixToolsTree(commands, overrideBuiltins);
-
-  // check if there are any commands to install
-  if (Object.keys(tree).length === 0) {
-    return;
+  // CRITICAL: If we are mounting to node_modules/.bin, we might be overwriting
+  // the 'shx' symlink created by npm. Some filesystems/containers might have
+  // issues mounting a file over a symlink. We ensure it's removed first.
+  if (mountPoint === DEFAULT_MOUNT_POINT) {
+    try {
+      const proc = await container.spawn("jsh", [
+        "-c",
+        `rm -f "${mountPoint}/shx"`,
+      ]);
+      await proc.exit;
+    } catch (e) {}
   }
+
+  const tree = createUnixToolsTree(commands, overrideBuiltins);
 
   // ensure the mount point exists
   if (mountPoint && mountPoint !== "." && mountPoint !== "/") {
@@ -289,7 +265,7 @@ export async function installUnixTools(
       ]);
       await proc.exit;
     } catch (e: any) {
-      // ignore errors if mkdir fails (e.g. dir already exists)
+      // ignore
     }
   }
 

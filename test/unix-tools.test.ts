@@ -92,6 +92,57 @@ test(
 );
 
 test(
+  "shx find also supports standard flags like -name",
+  { retry: 3, timeout: 120000 },
+  async ({ webcontainer }) => {
+    await webcontainer.mount({
+      "package.json": {
+        file: {
+          contents: JSON.stringify({ name: "test-shx-find", version: "1.0.0" }),
+        },
+      },
+    });
+
+    await webcontainer.installUnixTools({ commands: ["find"] });
+
+    await webcontainer.mkdir("test-dir");
+    await webcontainer.writeFile("test-dir/match.txt", "match");
+    await webcontainer.writeFile("test-dir/no-match.log", "no-match");
+
+    // test shx find directly
+    const output = await webcontainer.runCommand("./node_modules/.bin/shx", [
+      "find",
+      "test-dir",
+      "-name",
+      "*.txt",
+    ]);
+    expect(output).toContain("match.txt");
+    expect(output).not.toContain("no-match.log");
+  },
+);
+
+test(
+  "find -n works as an alias for -name",
+  { retry: 3, timeout: 120000 },
+  async ({ webcontainer }) => {
+    await webcontainer.mount({
+      "package.json": {
+        file: {
+          contents: JSON.stringify({ name: "test-find-n", version: "1.0.0" }),
+        },
+      },
+    });
+
+    await webcontainer.installUnixTools({ commands: ["find"] });
+
+    await webcontainer.writeFile("n-test.js", "console.log(1)");
+
+    const output = await webcontainer.runCommand("find", [".", "-n", "*.js"]);
+    expect(output).toContain("n-test.js");
+  },
+);
+
+test(
   "sed performs text substitution",
   { retry: 3, timeout: 120000 },
   async ({ webcontainer }) => {
@@ -216,36 +267,36 @@ test(
   },
 );
 
-test(
-  "pipes work between commands",
-  { retry: 3, timeout: 120000 },
-  async ({ webcontainer }) => {
-    await webcontainer.mount({
-      "package.json": {
-        file: {
-          contents: JSON.stringify({ name: "test-project", version: "1.0.0" }),
-        },
-      },
-    });
+// test( we have an owen test file for pipes
+//   "pipes work between commands",
+//   { retry: 3, timeout: 120000 },
+//   async ({ webcontainer }) => {
+//     await webcontainer.mount({
+//       "package.json": {
+//         file: {
+//           contents: JSON.stringify({ name: "test-project", version: "1.0.0" }),
+//         },
+//       },
+//     });
 
-    await webcontainer.installUnixTools({ commands: ["grep", "uniq"] });
+//     await webcontainer.installUnixTools({ commands: ["grep", "uniq"] });
 
-    await webcontainer.writeFile(
-      "data.txt",
-      "apple\nbanana\napple\ncherry\napple\nbanana\n",
-    );
+//     await webcontainer.writeFile(
+//       "data.txt",
+//       "apple\nbanana\napple\ncherry\napple\nbanana\n",
+//     );
 
-    // test pipe: cat | grep | uniq using shell to pipe commands together
-    const { isDone } = webcontainer.runCommand("sh", [
-      "-c",
-      "cat data.txt | grep apple | uniq",
-    ]);
+//     // test pipe: cat | grep | uniq using shell to pipe commands together
+//     const { isDone } = webcontainer.runCommand("sh", [
+//       "-c",
+//       "cat data.txt | grep apple | uniq",
+//     ]);
 
-    await isDone;
+//     await isDone;
 
-    // pipe executed successfully if we reach here
-  },
-);
+//     // pipe executed successfully if we reach here
+//   },
+// );
 
 test(
   "can skip shx installation if already present",
