@@ -1,3 +1,7 @@
+# CURRENT STATUS
+
+- grep works, find, uniq not
+
 # @webcontainer/test
 
 [![Version][version-badge]][npm-url]

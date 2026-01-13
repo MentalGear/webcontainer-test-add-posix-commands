@@ -50,9 +50,80 @@ async function main() {
   try {
     const git = await initGit();
 
+    // Mount local filesystem
+    // We need to mount the host's current working directory into the WASM environment
+    // so that git can access the actual files.
+    if (git.FS && git.FS.filesystems && git.FS.filesystems.NODEFS) {
+      const mountPoint = "/mnt";
+      try {
+        // Ensure mount point exists
+        try {
+          git.FS.stat(mountPoint);
+        } catch (e) {
+          git.FS.mkdir(mountPoint);
+        }
+
+        // Mount process.cwd() to /mnt
+        git.FS.mount(
+          git.FS.filesystems.NODEFS,
+          { root: process.cwd() },
+          mountPoint,
+        );
+
+        // Change directory to the mount point
+        git.FS.chdir(mountPoint);
+
+        // Configure git to trust the directory (fix for CVE-2022-24765)
+        // Since the owner of the mounted directory (host user) differs from the WASM user
+        // We set this globally in the WASM environment's memory/FS
+        const homeDir = "/home/web_user";
+        try {
+          // Ensure home exists
+          try {
+            git.FS.mkdir("/home");
+          } catch (e) {}
+          try {
+            git.FS.mkdir(homeDir);
+          } catch (e) {}
+
+          // Write .gitconfig
+          git.FS.writeFile(
+            `${homeDir}/.gitconfig`,
+            "[safe]\n\tdirectory = *\n",
+          );
+
+          // Ensure HOME environment variable points to it
+          // Emscripten environment variables
+          if (git.ENV) {
+            git.ENV.HOME = homeDir;
+          } else {
+            // Fallback for some emscripten versions if ENV is not directly exposed but might be in other ways
+            // Often setting it in process.env before init might help, but here we are post-init.
+            // We'll rely on git reading global config from standard locations if HOME isn't set perfectly,
+            // but usually emscripten uses /home/web_user by default or we can try to set it.
+          }
+        } catch (e) {
+          console.warn(`Warning: Failed to set .gitconfig: ${e.message}`);
+        }
+      } catch (e) {
+        // If mount fails, it might be because it's already mounted?
+        console.warn(`Warning: Failed to mount NODEFS: ${e.message}`);
+        // Fallback: try to just chdir if mount failed (maybe already mounted?)
+        try {
+          git.FS.chdir(mountPoint);
+        } catch (ignore) {}
+      }
+    } else {
+      console.warn(
+        "Warning: NODEFS not available in wasm-git. Filesystem changes won't be persisted.",
+      );
+    }
+
     // Call git with the provided arguments
     // The WASM module provides a callMain function
-    const exitCode = git.callMain(args);
+    const result = git.callMain(args);
+    // Handle both sync and async return values
+    const exitCode = result instanceof Promise ? await result : result;
 
     process.exit(exitCode || 0);
   } catch (error) {
