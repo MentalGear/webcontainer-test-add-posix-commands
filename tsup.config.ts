@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     plugin: "src/plugin.ts",
     "unix-tools": "src/unix-tools.ts",
+    "git-tools": "src/git-tools.ts",
   },
   outDir: "dist",
   format: ["esm"],

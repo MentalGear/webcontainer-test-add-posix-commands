@@ -24,6 +24,12 @@
         "types": "./dist/unix-tools.d.ts",
         "default": "./dist/unix-tools.js"
       }
+    },
+    "./git-tools": {
+      "import": {
+        "types": "./dist/git-tools.d.ts",
+        "default": "./dist/git-tools.js"
+      }
     }
   },
   "files": [

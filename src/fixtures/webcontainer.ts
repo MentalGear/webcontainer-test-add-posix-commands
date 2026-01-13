@@ -1,5 +1,6 @@
 import { WebContainer as WebContainerApi } from "@webcontainer/api";
 
+import { installGitTools, type InstallGitToolsOptions } from "../git-tools";
 import { installUnixTools, type InstallUnixToolsOptions } from "../unix-tools";
 import { FileSystem } from "./file-system";
 import { ProcessWrap } from "./process";
@@ -110,5 +111,29 @@ export class WebContainer extends FileSystem {
    */
   async installUnixTools(options: InstallUnixToolsOptions = {}): Promise<void> {
     await installUnixTools(this._instance, options);
+  }
+
+  /**
+   * Install git tools (isomorphic-git) into WebContainer.
+   * Provides `isogit` command and `git` alias for git operations.
+   *
+   * @param options - Installation options.
+   *
+   * @example
+   * ```ts
+   * // Install isogit and git alias
+   * await webcontainer.installGitTools();
+   *
+   * // Use git commands
+   * await webcontainer.runCommand('git', ['init']);
+   * await webcontainer.runCommand('git', ['add', '.']);
+   * await webcontainer.runCommand('git', ['commit', '-m', 'Initial commit']);
+   *
+   * // Or use isogit directly
+   * await webcontainer.runCommand('isogit', ['status']);
+   * ```
+   */
+  async installGitTools(options: InstallGitToolsOptions = {}): Promise<void> {
+    await installGitTools(this._instance, options);
   }
 }
