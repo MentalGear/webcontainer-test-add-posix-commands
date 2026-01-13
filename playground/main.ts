@@ -80,35 +80,36 @@ async function runCommand(cmd: string) {
 
   try {
     // Check for cd command
-    if (cmd.startsWith("cd ") || cmd === "cd") {
-      const target = cmd === "cd" ? "/" : cmd.slice(3).trim();
+    // if (cmd.startsWith("cd ") || cmd === "cd") {
+    //   const target = cmd === "cd" ? "/" : cmd.slice(3).trim();
 
-      // We run cd in a subshell and capture the resulting pwd to update our state
-      const proc = await webcontainer.spawn("jsh", [
-        "-c",
-        `cd "${currentDir || "."}" && cd "${target}" && pwd`,
-      ]);
+    //   // We run cd in a subshell and capture the resulting pwd to update our state
+    //   const proc = await webcontainer.spawn("jsh", [
+    //     "-c",
+    //     // `cd "${currentDir || "."}" && cd "${target}" && pwd`,
+    //     `cd ${target}`,
+    //   ]);
 
-      let newPath = "";
-      proc.output.pipeTo(
-        new WritableStream({
-          write(data) {
-            newPath += data;
-          },
-        }),
-      );
+    //   let newPath = "";
+    //   proc.output.pipeTo(
+    //     new WritableStream({
+    //       write(data) {
+    //         newPath += data;
+    //       },
+    //     }),
+    //   );
 
-      const exitCode = await proc.exit;
-      if (exitCode === 0) {
-        currentDir = newPath.trim();
-        log(`Changed directory to: ${currentDir || "/"}`);
-        await updateFilesList();
-        return;
-      } else {
-        log(`cd failed`, "#ff4444");
-        return;
-      }
-    }
+    //   const exitCode = await proc.exit;
+    //   if (exitCode === 0) {
+    //     currentDir = newPath.trim();
+    //     log(`Changed directory to: ${currentDir || "/"}`);
+    //     await updateFilesList();
+    //     return;
+    //   } else {
+    //     log(`cd failed`, "#ff4444");
+    //     return;
+    //   }
+    // }
 
     // Run command with toolsDir in PATH - USE ABSOLUTE PATH
     const process = await webcontainer.spawn(
@@ -171,6 +172,7 @@ async function boot() {
               version: "1.0.0",
               devDependencies: {
                 shx: "^0.3.4",
+                "wasm-git": "^0.0.13",
               },
             },
             null,
@@ -267,8 +269,48 @@ async function boot() {
     );
     await verifyProc.exit;
 
+    // Install wasm-git and mount git wrapper
+    log("Installing wasm-git...", "#00d4ff");
+    const gitInstallProc = await webcontainer.spawn("jsh", [
+      "-c",
+      "npm install wasm-git --save-dev",
+    ]);
+    gitInstallProc.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          if (data.trim()) log(data, "#666");
+        },
+      }),
+    );
+    await gitInstallProc.exit;
+
+    // Fetch and mount the git wrapper script
+    log("Installing git command...", "#00d4ff");
+    const gitWrapperResponse = await fetch("/git-wrapper.js");
+    const gitWrapperContent = await gitWrapperResponse.text();
+
+    await webcontainer.mount(
+      {
+        git: {
+          file: {
+            contents: gitWrapperContent,
+          },
+        },
+      },
+      { mountPoint: toolsDir },
+    );
+
+    // Make git executable
+    const chmodGitProc = await webcontainer.spawn("jsh", [
+      "-c",
+      `chmod +x ${toolsDir}/git`,
+    ]);
+    await chmodGitProc.exit;
+
     log(
-      "Ready! Unix tools installed: " + RECOMMENDED_COMMANDS.join(", "),
+      "Ready! Unix tools installed: " +
+        RECOMMENDED_COMMANDS.join(", ") +
+        ", git",
       "#00ff88",
     );
     log("", "#888");

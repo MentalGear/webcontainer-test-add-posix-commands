@@ -129,11 +129,8 @@ export const RECOMMENDED_COMMANDS = [
   "find",
   "sed",
   "uniq",
-  "test",
-  "dirs",
-  "head",
-  "tail",
-  "sort",
+  // "test",
+  // "dirs",
 ] as const;
 
 /**
