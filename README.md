@@ -1,6 +1,7 @@
 # CURRENT STATUS
 
-- grep works, find, uniq not
+- Stopped due to limitations of webcontainers and its closed-source nature that make it a big hurdle to debug wasm-based commands or other additions
+- grep works - find, uniq not
 
 # @webcontainer/test
 
