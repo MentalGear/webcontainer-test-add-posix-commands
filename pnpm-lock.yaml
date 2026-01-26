@@ -14,6 +14,12 @@ importers:
       '@webcontainer/snapshot':
         specifier: ^0.1.0
         version: 0.1.0
+      '@xterm/xterm':
+        specifier: ^6.0.0
+        version: 6.0.0
+      wasm-git:
+        specifier: ^0.0.13
+        version: 0.0.13
     devDependencies:
       '@blitz/eslint-plugin':
         specifier: ^0.1.4
@@ -568,6 +574,9 @@ packages:
   '@webcontainer/snapshot@0.1.0':
     resolution: {integrity: sha512-PTIGQ3osUpTbK/dqB8RYbcZGv8IK+DJACx709z5sFbeIlngB3hUFpTEYFYs1SbUvr/AEQqvd0/bhc4ectrPRRw==}
     engines: {node: '>=16'}
+
+  '@xterm/xterm@6.0.0':
+    resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1228,10 +1237,6 @@ packages:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
 
-  picomatch@4.0.2:
-    resolution: {integrity: sha512-M7BAV6Rlcy5u+m6oPhAPFgJTzAioX/6B0DxyvDlo9l8+T3nLKbrczg2WLUyzd45L8RqfUMyGPzekbMvX2Ldkwg==}
-    engines: {node: '>=12'}
-
   picomatch@4.0.3:
     resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
     engines: {node: '>=12'}
@@ -1647,6 +1652,9 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  wasm-git@0.0.13:
+    resolution: {integrity: sha512-+tXBed4anOsBIX94omuuabzDTrhQDh5sNsgD7Ezq9nuvM9aK8XfDADK0MWOmkMdSrXCaU1YKzWtTErRFvfwdWg==}
 
   webidl-conversions@4.0.2:
     resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
@@ -2188,6 +2196,8 @@ snapshots:
     dependencies:
       '@msgpack/msgpack': 3.1.1
 
+  '@xterm/xterm@6.0.0': {}
+
   acorn-jsx@5.3.2(acorn@8.14.1):
     dependencies:
       acorn: 8.14.1
@@ -2541,9 +2551,9 @@ snapshots:
     dependencies:
       reusify: 1.1.0
 
-  fdir@6.4.3(picomatch@4.0.2):
+  fdir@6.4.3(picomatch@4.0.3):
     optionalDependencies:
-      picomatch: 4.0.2
+      picomatch: 4.0.3
 
   fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
@@ -2835,8 +2845,6 @@ snapshots:
 
   picomatch@2.3.1: {}
 
-  picomatch@4.0.2: {}
-
   picomatch@4.0.3: {}
 
   pirates@4.0.7: {}
@@ -3060,8 +3068,8 @@ snapshots:
 
   tinyglobby@0.2.12:
     dependencies:
-      fdir: 6.4.3(picomatch@4.0.2)
-      picomatch: 4.0.2
+      fdir: 6.4.3(picomatch@4.0.3)
+      picomatch: 4.0.3
 
   tinyglobby@0.2.15:
     dependencies:
@@ -3204,6 +3212,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  wasm-git@0.0.13: {}
 
   webidl-conversions@4.0.2: {}
 
